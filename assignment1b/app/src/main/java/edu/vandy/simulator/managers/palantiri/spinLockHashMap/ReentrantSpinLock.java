@@ -17,6 +17,7 @@ public class ReentrantSpinLock
      * should be "unlocked".
      */
     // TODO -- you fill in here.
+    private final AtomicReference<Thread> owner = new AtomicReference<>(null);
     
 
     /**
@@ -24,14 +25,15 @@ public class ReentrantSpinLock
      * acquired the lock.
      */
     // TODO -- you fill in here.
-    
+    private int recursionCount = 0;
+
 
     /**
      * @return The current recursion count.
      */
     public int getRecursionCount() {
         // TODO -- you fill in here replacing this statement with your solution.
-        return -1;
+        return recursionCount;
     }
 
     /**
@@ -45,7 +47,11 @@ public class ReentrantSpinLock
         // Try to set mOwner's value to the thread (true), which
         // succeeds iff its current value is null (false).
         // TODO -- you fill in here replacing this statement with your solution.
-        return false;
+        boolean wasLocked = owner.compareAndSet(null, Thread.currentThread());
+        if (wasLocked) {
+            recursionCount = 0;
+        }
+        return wasLocked;
     }
 
     /**
@@ -68,7 +74,15 @@ public class ReentrantSpinLock
         // check if a shutdown has been requested and if so throw a
         // cancellation exception.  
         // TODO -- you fill in here.
-        
+        if (owner.get() == Thread.currentThread()) {
+            recursionCount++;
+        } else {
+            while (!tryLock()) {
+                if (isCancelled.get()) {
+                    throw new CancellationException("Cancelled!");
+                }
+            }
+        }
     }
 
     /**
@@ -84,6 +98,13 @@ public class ReentrantSpinLock
         // then throw IllegalMonitorStateException.
 
         // TODO -- you fill in here.
-        
+        if (owner.get() == Thread.currentThread()) {
+            recursionCount = Integer.max(recursionCount - 1, 0);
+            if (recursionCount == 0) {
+                owner.set(null);
+            }
+        } else {
+            throw new IllegalMonitorStateException();
+        }
     }
 }

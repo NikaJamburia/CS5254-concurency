@@ -1,9 +1,12 @@
 package edu.vandy.simulator.managers.palantiri.spinLockHashMap;
 
+import androidx.annotation.NonNull;
+
 import org.jetbrains.annotations.NotNull;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.Semaphore;
 
 import edu.vandy.simulator.managers.palantiri.Palantir;
@@ -32,6 +35,7 @@ public class SpinLockHashMapMgr extends PalantiriManager {
      * serialize on a critical section.
      */
     // TODO -- you fill in here.
+    private CancellableLock lock;
     
 
     /**
@@ -39,6 +43,7 @@ public class SpinLockHashMapMgr extends PalantiriManager {
      * number of available palantiri managed by the PalantiriManager.
      */
     // TODO -- you fill in here.
+    private Semaphore semaphore;
     
 
     /**
@@ -53,7 +58,8 @@ public class SpinLockHashMapMgr extends PalantiriManager {
         // Initialize the Semaphore to use a "fair" implementation
         // that mediates concurrent access to the given Palantiri.
         // TODO -- you fill in here.
-        
+        semaphore = new Semaphore(2, true);
+
 
         if (Assignment.isUndergraduate()) {
             // UNDERGRADUATES:
@@ -83,13 +89,15 @@ public class SpinLockHashMapMgr extends PalantiriManager {
             // null value with your ReentrantSpinLock implementation.
 
             // TODO -- you fill in here.
-            
+            lock = new ReentrantSpinLock();
+
 
             // Use the List.forEach() method to iterate through the
             // List of Palantiri returned via the getPalantiri()
             // factory method and initialize each key in the
             // mPalantiriMap with "true" to indicate it's available.
             // TODO -- you fill in here.
+            getPalantiri().forEach(p -> mPalantiriMap.put(p, true));
 
             
         } else {
@@ -121,18 +129,29 @@ public class SpinLockHashMapMgr extends PalantiriManager {
         // exceptions.
 
         // TODO -- you fill in here.
-        
+        semaphore.acquire();
+        lock.lock(() -> false);
+        try {
+            var palantirEntry = getFirstAvailablePalantir();
+            while (palantirEntry.isEmpty()) {
+                palantirEntry = getFirstAvailablePalantir();
+            }
 
-        // This invariant should always hold for all acquire()
-        // implementations if implemented correctly. That is the
-        // purpose of enforcing the @NotNull along with the
-        // CancellationException; It makes it clear that all
-        // implementations should either be successful (if implemented
-        // correctly) and return a Palantir, or fail because of
-        // cancellation.
-        throw new IllegalStateException("This method should either return a valid " +
-                "Palantir or throw a CancellationException. " +
-                "In either case, this statement should not be reached.");
+            var palantir = palantirEntry.get().getKey();
+            mPalantiriMap.put(palantir, false);
+            return palantir;
+        } finally {
+            lock.unlock();
+        }
+
+    }
+
+    @NonNull
+    private Optional<Map.Entry<Palantir, Boolean>> getFirstAvailablePalantir() {
+        return mPalantiriMap
+                .entrySet()
+                .stream()
+                .filter(Map.Entry::getValue).findFirst();
     }
 
     /**
@@ -155,6 +174,15 @@ public class SpinLockHashMapMgr extends PalantiriManager {
         // 3. Only release the semaphore if the palantir parameter
         //    is correct.
         // TODO -- you fill in here.
+        lock.lock(() -> false);
+        try {
+            if (mPalantiriMap.replace(palantir, true) == null) {
+                throw new IllegalArgumentException("Palentir invalid!");
+            }
+        } finally {
+            lock.unlock();
+            semaphore.release();
+        }
         
     }
 
