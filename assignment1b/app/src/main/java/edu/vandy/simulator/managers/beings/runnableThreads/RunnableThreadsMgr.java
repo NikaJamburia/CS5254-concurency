@@ -1,6 +1,7 @@
 package edu.vandy.simulator.managers.beings.runnableThreads;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 import edu.vandy.simulator.managers.beings.BeingManager;
 import edu.vandy.simulator.utils.ExceptionUtils;
@@ -34,7 +35,7 @@ public class RunnableThreadsMgr
     public SimpleBeingRunnable newBeing() {
         // Return a new SimpleBeingRunnable instance.
         // TODO -- you fill in here replacing this statement with your solution.
-        return null;
+        return new SimpleBeingRunnable(this);
     }
 
     /**
@@ -45,17 +46,22 @@ public class RunnableThreadsMgr
     public void runSimulation() {
         // Call a method to create and start a thread for each being.
         // TODO -- you fill in here.
-        
+        beginBeingThreads();
 
         // Call a method that creates and starts a thread that's then
         //  used to wait for all the being threads to finish and
         //  return that thread to the caller.
         // TODO -- you fill in here.
-        
+        Thread waiter = createAndStartWaiterForBeingThreads();
+
 
         // Block until the waiter thread has finished.
         // TODO -- you fill in here.
-        
+        try {
+            waiter.join();
+        } catch (InterruptedException e) {
+            error(e);
+        }
     }
 
     /**
@@ -76,11 +82,17 @@ public class RunnableThreadsMgr
         // (though they are free to do so if they choose).
         //
         // TODO -- you fill in here.
-        
+        mBeingThreads = getBeings().stream()
+                .map(target -> {
+                    var thread = new Thread(target);
+                    thread.setUncaughtExceptionHandler((th, e) -> error(e));
+                    return thread;
+                })
+                .collect(Collectors.toList());
 
         // Start all the threads in the List of Threads.
         // TODO -- you fill in here.
-        
+        mBeingThreads.forEach(Thread::start);
     }
 
     /**
@@ -97,15 +109,23 @@ public class RunnableThreadsMgr
         // the catch clause, which trigger the simulator to generate a
         // shutdownNow() request.
         // TODO -- you fill in here.
-        
+        Thread waiter = new Thread(() -> {
+            mBeingThreads.forEach(t -> {
+                try {
+                    t.join();
+                } catch (InterruptedException e) {
+                    error(e);
+                }
+            });
+        });
 
         // Start running the thread.
         // TODO -- you fill in here.
-        
+        waiter.start();
 
         // Return the thread.
         // TODO -- you fill in here replacing this statement with your solution.
-        return null;
+        return waiter;
     }
 
     /**

@@ -48,6 +48,16 @@ public class SimpleBeingRunnable
         // for this being via a call to the appropriate Being super
         // class helper method.
         // TODO -- you fill in here.
-        
+        Palantir palantir = acquirePalantir();
+
+        if (palantir != null) {
+            try {
+                palantir.gaze(this);
+            } finally {
+                releasePalantir(palantir);
+            }
+        } else {
+            error("Palantir is null");
+        }
     }
 }
