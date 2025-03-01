@@ -5,6 +5,7 @@ import androidx.annotation.NonNull;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.Semaphore;
@@ -58,7 +59,7 @@ public class SpinLockHashMapMgr extends PalantiriManager {
         // Initialize the Semaphore to use a "fair" implementation
         // that mediates concurrent access to the given Palantiri.
         // TODO -- you fill in here.
-        semaphore = new Semaphore(2, true);
+        semaphore = new Semaphore(4, true);
 
 
         if (Assignment.isUndergraduate()) {
@@ -97,7 +98,9 @@ public class SpinLockHashMapMgr extends PalantiriManager {
             // factory method and initialize each key in the
             // mPalantiriMap with "true" to indicate it's available.
             // TODO -- you fill in here.
-            getPalantiri().forEach(p -> mPalantiriMap.put(p, true));
+            List<Palantir> palantiri = getPalantiri();
+            palantiri.size();
+            palantiri.forEach(p -> mPalantiriMap.put(p, true));
 
             
         } else {
@@ -130,7 +133,7 @@ public class SpinLockHashMapMgr extends PalantiriManager {
 
         // TODO -- you fill in here.
         semaphore.acquire();
-        lock.lock(() -> false);
+        lock.lock(this::isShutdown);
         try {
             var palantirEntry = getFirstAvailablePalantir();
             while (palantirEntry.isEmpty()) {
@@ -174,16 +177,21 @@ public class SpinLockHashMapMgr extends PalantiriManager {
         // 3. Only release the semaphore if the palantir parameter
         //    is correct.
         // TODO -- you fill in here.
-        lock.lock(() -> false);
+
+        if (palantir == null) {
+            throw new IllegalArgumentException("I hate nulls!");
+        }
+
+        lock.lock(this::isShutdown);
         try {
-            if (mPalantiriMap.replace(palantir, true) == null) {
+            Boolean previousValue = mPalantiriMap.replace(palantir, true);
+            if (previousValue == null || previousValue) {
                 throw new IllegalArgumentException("Palentir invalid!");
             }
         } finally {
             lock.unlock();
-            semaphore.release();
         }
-        
+        semaphore.release();
     }
 
     /**
